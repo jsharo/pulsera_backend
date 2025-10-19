@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id_usuario      Int      @id @default(autoincrement())
+  nombre          String   @db.VarChar(100)
+  telefono        String?  @db.VarChar(15)
+  direccion       String?
+  fecha_nacimiento DateTime?
+  created_at      DateTime @default(now())
+  
+  // Relaciones
+  dispositivos      Dispositivo[]
+  contactos         Contacto[]
+  horariosMedicacion HorarioMedicacion[]
+  
+  @@map("usuarios")
+}
+
+model Dispositivo {
+  id_dispositivo   Int      @id @default(autoincrement())
+  id_usuario       Int
+  mac_address      String   @unique @db.VarChar(17)
+  nombre_pulsera   String   @default("Pulsera Principal") @db.VarChar(50)
+  bateria          Int      @default(100)
+  estado           EstadoDispositivo @default(activo)
+  ultima_conexion  DateTime?
+  
+  // Relaciones
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  alertas Alerta[]
+  
+  @@map("dispositivos")
+}
+
+model Contacto {
+  id_contacto      Int     @id @default(autoincrement())
+  id_usuario       Int
+  nombre           String  @db.VarChar(100)
+  telefono         String  @db.VarChar(15)
+  email            String? @db.VarChar(100)
+  prioridad        Int     @default(1)
+  token_notificacion String?
+  
+  // Relaciones
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  notificaciones Notificacion[]
+  
+  @@map("contactos")
+}
+
+model Medicamento {
+  id_medicamento   Int     @id @default(autoincrement())
+  nombre           String  @db.VarChar(100)
+  descripcion      String?
+  instrucciones    String?
+  
+  // Relaciones
+  horariosMedicacion HorarioMedicacion[]
+  
+  @@map("medicamentos")
+}
+
+model HorarioMedicacion {
+  id_horario       Int      @id @default(autoincrement())
+  id_usuario       Int
+  id_medicamento   Int
+  dosis            String   @db.VarChar(50)
+  hora             DateTime // Se usa DateTime para facilitar queries
+  dias_semana      String   @db.VarChar(13)
+  activo           Boolean  @default(true)
+  
+  // Relaciones
+  usuario       Usuario       @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  medicamento   Medicamento   @relation(fields: [id_medicamento], references: [id_medicamento], onDelete: Cascade)
+  alertasMedicacion AlertaMedicacion[]
+  
+  @@map("horarios_medicacion")
+}
+
+model Alerta {
+  id_alerta        Int        @id @default(autoincrement())
+  id_dispositivo   Int
+  tipo_alerta      TipoAlerta
+  fecha_hora       DateTime   @default(now())
+  ubicacion        String?
+  estado           EstadoAlerta @default(pendiente)
+  
+  // Relaciones
+  dispositivo   Dispositivo   @relation(fields: [id_dispositivo], references: [id_dispositivo], onDelete: Cascade)
+  notificaciones Notificacion[]
+  
+  @@map("alertas")
+}
+
+model AlertaMedicacion {
+  id_alerta_med        Int                 @id @default(autoincrement())
+  id_horario           Int
+  fecha_hora_programada DateTime
+  fecha_hora_envio     DateTime?
+  estado               EstadoAlertaMedicacion @default(pendiente)
+  
+  // Relaciones
+  horario        HorarioMedicacion @relation(fields: [id_horario], references: [id_horario], onDelete: Cascade)
+  notificaciones Notificacion[]
+  
+  @@map("alertas_medicacion")
+}
+
+model Notificacion {
+  id_notificacion   Int                @id @default(autoincrement())
+  id_alerta         Int?
+  id_alerta_med     Int?
+  id_contacto       Int
+  fecha_envio       DateTime           @default(now())
+  estado            EstadoNotificacion @default(enviada)
+  tipo_notificacion TipoNotificacion
+  
+  // Relaciones
+  contacto    Contacto        @relation(fields: [id_contacto], references: [id_contacto], onDelete: Cascade)
+  alerta      Alerta?         @relation(fields: [id_alerta], references: [id_alerta], onDelete: Cascade)
+  alertaMedicacion AlertaMedicacion? @relation(fields: [id_alerta_med], references: [id_alerta_med], onDelete: Cascade)
+  
+  @@map("notificaciones")
+}
+
+// ENUMS
+enum EstadoDispositivo {
+  activo
+  inactivo
+  falla
+}
+
+enum TipoAlerta {
+  manual
+  automatica
+}
+
+enum EstadoAlerta {
+  pendiente
+  en_camino
+  atendida
+  cancelada
+}
+
+enum EstadoAlertaMedicacion {
+  pendiente
+  enviada
+  confirmada
+  omitida
+}
+
+enum EstadoNotificacion {
+  enviada
+  recibida
+  leida
+  fallo
+}
+
+enum TipoNotificacion {
+  emergencia
+  medicacion
+}
